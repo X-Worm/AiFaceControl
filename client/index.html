@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AI Addicts Club — Face Control</title>
+    <style>
+      :root {
+        --bg: #0a0a0f;
+        --neon: #ff2d78;
+        --neon2: #22d3ee;
+        --gold: #f5c451;
+        --door: #241a12;
+        --door-edge: #3a2a1c;
+      }
+      * { box-sizing: border-box; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: radial-gradient(1200px 800px at 50% -10%, #1a1030 0%, var(--bg) 60%);
+        color: #e9e9f0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        min-height: 100%; padding: 24px; text-align: center; overflow: hidden;
+      }
+      .sign {
+        font-weight: 800; letter-spacing: 3px; text-transform: uppercase;
+        font-size: clamp(20px, 5vw, 40px); margin-bottom: 6px; color: #fff;
+        text-shadow: 0 0 6px var(--neon), 0 0 18px var(--neon), 0 0 40px var(--neon);
+        animation: flicker 4s infinite;
+      }
+      .sub-sign { color: var(--neon2); letter-spacing: 6px; font-size: 12px; text-transform: uppercase; opacity: .85; margin-bottom: 26px; }
+      @keyframes flicker { 0%,19%,21%,23%,80%,100% { opacity: 1; } 20%,22%,81% { opacity: .55; } }
+
+      /* --- Door scene --- */
+      .scene { perspective: 1400px; width: min(340px, 78vw); aspect-ratio: 3 / 4; position: relative; }
+      body[data-state="idle"] .scene,
+      body[data-state="closed-again"] .scene,
+      body[data-state="error"] .scene { cursor: pointer; }
+      .frame {
+        position: absolute; inset: 0; border-radius: 14px;
+        background: linear-gradient(180deg, #17110b, #0d0a07);
+        box-shadow: 0 30px 80px rgba(0,0,0,.6), inset 0 0 0 6px var(--door-edge);
+        overflow: hidden; transform-style: preserve-3d;
+      }
+      .interior {
+        position: absolute; inset: 0; z-index: 1; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 18px; padding: 24px;
+        background: radial-gradient(circle at 50% 35%, #3a1d5c 0%, #120a22 70%);
+        opacity: 0; transition: opacity 1s ease .5s;
+      }
+      body[data-state="granted"] .interior { opacity: 1; }
+      .welcome { font-size: clamp(18px, 4.5vw, 26px); font-weight: 800; color: #fff; text-shadow: 0 0 14px var(--neon); }
+      .gh {
+        display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+        background: #fff; color: #111; font-weight: 700; padding: 10px 16px; border-radius: 999px;
+        transition: transform .15s ease; font-size: 14px;
+      }
+      .gh:hover { transform: translateY(-2px); }
+
+      /* Rex the bouncer robot - hidden below the doorway, steps out on knock */
+      .rex {
+        position: absolute; left: 50%; bottom: -2%; width: 62%; z-index: 5;
+        transform: translate(-50%, 72%); opacity: 0;
+        transition: transform 1.2s cubic-bezier(.2,.8,.2,1), opacity .5s ease;
+      }
+      body[data-state="connecting"] .rex,
+      body[data-state="talking"] .rex { transform: translate(-50%, 6%); opacity: 1; }
+      body[data-state="talking"] .rex { animation: bob 2.6s ease-in-out infinite; }
+      body[data-state="granted"] .rex { transform: translate(-128%, 16%) scale(.82); opacity: .9; }
+      @keyframes bob { 0%,100% { margin-top: 0; } 50% { margin-top: -8px; } }
+      .rex .eye { animation: scan 2s ease-in-out infinite; }
+      @keyframes scan { 0%,100% { transform: translateX(0); opacity: 1; } 50% { transform: translateX(34px); opacity: .6; } }
+
+      .panel {
+        position: absolute; top: 0; bottom: 0; width: 50%; z-index: 3;
+        background: repeating-linear-gradient(180deg, var(--door) 0 26px, #1e150d 26px 28px);
+        border: 1px solid #0c0906; transition: transform 1.5s cubic-bezier(.22,.8,.2,1);
+        transform-style: preserve-3d; backface-visibility: hidden;
+      }
+      .panel::after { content: ""; position: absolute; top: 46%; width: 12px; height: 34px; border-radius: 6px; background: var(--gold); box-shadow: 0 0 10px rgba(245,196,81,.6); }
+      .panel.left { left: 0; transform-origin: left center; }
+      .panel.left::after { right: 12px; }
+      .panel.right { right: 0; transform-origin: right center; }
+      .panel.right::after { left: 12px; }
+
+      /* ajar while Rex is out, wide open once you're in */
+      body[data-state="connecting"] .panel.left,
+      body[data-state="talking"] .panel.left { transform: rotateY(30deg); }
+      body[data-state="connecting"] .panel.right,
+      body[data-state="talking"] .panel.right { transform: rotateY(-30deg); }
+      body[data-state="granted"] .panel.left { transform: rotateY(112deg); }
+      body[data-state="granted"] .panel.right { transform: rotateY(-112deg); }
+
+      /* --- Controls / status --- */
+      .status { min-height: 24px; margin: 22px 0 14px; color: #b9b9c9; font-size: 15px; }
+      .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--neon2); margin-right: 8px; vertical-align: middle; }
+      body[data-state="talking"] .dot { animation: pulse 1.1s infinite; }
+      @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1);} 50% { opacity: .3; transform: scale(1.6);} }
+
+      button.action {
+        appearance: none; border: 0; cursor: pointer; font-weight: 800; letter-spacing: .5px; color: #fff;
+        background: linear-gradient(90deg, var(--neon), #b91d55); padding: 14px 26px; border-radius: 999px;
+        font-size: 16px; box-shadow: 0 10px 30px rgba(255,45,120,.35); transition: transform .15s ease, opacity .2s;
+      }
+      button.action:hover { transform: translateY(-2px); }
+      button.action:disabled { opacity: .5; cursor: default; transform: none; }
+      #knock, #retry, #leave { display: none; }
+      body[data-state="idle"] #knock,
+      body[data-state="error"] #retry,
+      body[data-state="closed-again"] #retry { display: inline-block; }
+      body[data-state="talking"] #leave { display: inline-block; }
+      body[data-state="granted"] .status, body[data-state="granted"] .controls { display: none; }
+      .hint { margin-top: 18px; font-size: 12px; color: #6f6f82; max-width: 320px; }
+    </style>
+  </head>
+  <body data-state="idle">
+    <div class="sign">AI Addicts Club</div>
+    <div class="sub-sign">members only · face control · EN only</div>
+
+    <div class="scene" id="scene">
+      <div class="frame">
+        <div class="interior">
+          <div class="welcome" id="welcome-line">Welcome to the club, buddy.</div>
+          <a class="gh" id="gh-link" href="#" target="_blank" rel="noopener">★ See how it's built on GitHub →</a>
+        </div>
+
+        <!-- Rex the bouncer -->
+        <svg class="rex" viewBox="0 0 200 260" xmlns="http://www.w3.org/2000/svg" aria-label="Rex the bouncer robot">
+          <defs>
+            <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#d3dae9"/><stop offset=".5" stop-color="#8a94ad"/><stop offset="1" stop-color="#5b6478"/>
+            </linearGradient>
+            <linearGradient id="metal2" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#9aa3ba"/><stop offset="1" stop-color="#3c4356"/>
+            </linearGradient>
+          </defs>
+          <!-- torso -->
+          <rect x="34" y="150" width="132" height="105" rx="28" fill="url(#metal2)"/>
+          <circle cx="44" cy="162" r="20" fill="url(#metal)"/>
+          <circle cx="156" cy="162" r="20" fill="url(#metal)"/>
+          <!-- bowtie -->
+          <path d="M100 150 l-16 -9 v18 z M100 150 l16 -9 v18 z" fill="#ff2d78"/>
+          <circle cx="100" cy="150" r="4" fill="#b91d55"/>
+          <!-- crossed arms -->
+          <rect x="50" y="182" width="100" height="19" rx="9" fill="#2f3648" transform="rotate(10 100 191)"/>
+          <rect x="50" y="182" width="100" height="19" rx="9" fill="#454c5e" transform="rotate(-10 100 191)"/>
+          <!-- neck -->
+          <rect x="88" y="128" width="24" height="20" fill="#5b6478"/>
+          <!-- head -->
+          <rect x="54" y="42" width="92" height="92" rx="24" fill="url(#metal)"/>
+          <!-- antenna -->
+          <rect x="97" y="26" width="6" height="18" rx="3" fill="#5b6478"/>
+          <circle cx="100" cy="24" r="6" fill="#22d3ee"/>
+          <!-- earpiece -->
+          <circle cx="150" cy="92" r="8" fill="#2f3648"/>
+          <path d="M150 100 q10 22 -6 34" stroke="#2f3648" stroke-width="4" fill="none"/>
+          <!-- visor -->
+          <rect x="62" y="72" width="76" height="30" rx="15" fill="#0b0f18"/>
+          <rect class="eye" x="70" y="80" width="24" height="14" rx="7" fill="#22d3ee"/>
+        </svg>
+
+        <div class="panel left"></div>
+        <div class="panel right"></div>
+      </div>
+    </div>
+
+    <div class="status" id="status"><span class="dot"></span><span id="status-text">The door is shut. Knock to meet the bouncer.</span></div>
+
+    <div class="controls">
+      <button class="action" id="knock">🚪 Knock on the door</button>
+      <button class="action" id="retry">Try again</button>
+      <button class="action" id="leave">Leave</button>
+    </div>
+
+    <div class="hint">Rex is a voice bouncer. Knock, allow your mic, and talk your way into the club.</div>
+
+    <audio id="bot-audio" autoplay></audio>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "@pipecat-ai/client-js": "https://esm.sh/@pipecat-ai/client-js@1.12.0",
+          "@pipecat-ai/daily-transport": "https://esm.sh/@pipecat-ai/daily-transport@1.6.7?deps=@pipecat-ai/client-js@1.12.0"
+        }
+      }
+    </script>
+    <script type="module">
+      import { PipecatClient } from "@pipecat-ai/client-js";
+      import { DailyTransport } from "@pipecat-ai/daily-transport";
+
+      // --- Configure ---
+      // Bot runner. Local: http://localhost:7860/start · Prod: https://your-domain/start
+      const BOT_START_URL = "http://localhost:7860/start";
+      const GITHUB_URL = "https://github.com/X-Worm/AiFaceControl";
+      // -----------------
+
+      document.getElementById("gh-link").href = GITHUB_URL;
+
+      const statusText = document.getElementById("status-text");
+      const knockBtn = document.getElementById("knock");
+      const retryBtn = document.getElementById("retry");
+      const leaveBtn = document.getElementById("leave");
+      const scene = document.getElementById("scene");
+
+      let pc = null;
+
+      function setState(name, text) {
+        document.body.dataset.state = name;
+        if (text) statusText.textContent = text;
+      }
+
+      // --- Synthesized sound (no external assets) ---
+      let audioCtx = null;
+      function ensureAudio() {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        return audioCtx;
+      }
+      function thud(ctx, t) {
+        const dur = 0.18, buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+        const d = buf.getChannelData(0);
+        for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3);
+        const src = ctx.createBufferSource(); src.buffer = buf;
+        const lp = ctx.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 210;
+        const g = ctx.createGain(); g.gain.value = 0.9;
+        src.connect(lp); lp.connect(g); g.connect(ctx.destination); src.start(t);
+      }
+      function playKnock() {
+        const ctx = ensureAudio(), n = ctx.currentTime;
+        thud(ctx, n); thud(ctx, n + 0.22); thud(ctx, n + 0.44);
+      }
+      function playServo() {
+        const ctx = ensureAudio(), t = ctx.currentTime + 0.5;
+        const o = ctx.createOscillator(); o.type = "sawtooth";
+        o.frequency.setValueAtTime(320, t); o.frequency.exponentialRampToValueAtTime(90, t + 0.4);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(0.1, t + 0.05);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45);
+        o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + 0.5);
+      }
+
+      function playBotAudio(track, participant) {
+        if (participant?.local || track.kind !== "audio") return;
+        const el = document.getElementById("bot-audio");
+        el.srcObject = new MediaStream([track]);
+        el.play().catch(() => {});
+      }
+
+      function openDoor(welcome) {
+        document.getElementById("welcome-line").textContent = welcome || "Welcome to the club, buddy.";
+        setState("granted");
+      }
+
+      function handleServerMessage(msg) {
+        const data = msg?.data ?? msg;
+        if (data && data.type === "door-open") openDoor(data.welcome);
+      }
+
+      async function knock() {
+        // Knock, crack the doors, and have Rex step out - ambience runs regardless
+        // of how long the real connection takes.
+        try { playKnock(); playServo(); } catch (e) { /* audio optional */ }
+        setState("connecting", "Approaching the door…");
+        knockBtn.disabled = true;
+
+        pc = new PipecatClient({
+          transport: new DailyTransport(),
+          enableMic: true,
+          enableCam: false,
+          callbacks: {
+            onTrackStarted: playBotAudio,
+            onServerMessage: handleServerMessage,
+            onBotReady: () => setState("talking", "Rex is sizing you up. Talk to him."),
+            onConnected: () => setState("talking", "Rex is sizing you up. Talk to him."),
+            onDisconnected: () => {
+              if (document.body.dataset.state !== "granted")
+                setState("closed-again", "The door stayed shut. Try again?");
+            },
+            onError: (e) => { console.error("Pipecat error:", e); setState("error", "Something went wrong. Try again?"); },
+          },
+        });
+
+        try {
+          // The Pipecat dev runner needs a body telling it to spin up a Daily
+          // room; startBotAndConnect POSTs requestData to /start, then connects
+          // the DailyTransport with the room + token the runner returns.
+          await pc.startBotAndConnect({
+            endpoint: BOT_START_URL,
+            requestData: { transport: "daily", createDailyRoom: true },
+          });
+        } catch (e) {
+          console.error("Connect failed:", e);
+          setState("error", "Couldn't reach the club. Is the bot running?");
+        } finally {
+          knockBtn.disabled = false;
+        }
+      }
+
+      async function leave() {
+        try { await pc?.disconnect(); } catch {}
+        setState("idle", "The door is shut. Knock to meet the bouncer.");
+      }
+
+      const idleStates = ["idle", "closed-again", "error"];
+      knockBtn.addEventListener("click", knock);
+      retryBtn.addEventListener("click", knock);
+      leaveBtn.addEventListener("click", leave);
+      scene.addEventListener("click", () => { if (idleStates.includes(document.body.dataset.state)) knock(); });
+    </script>
+  </body>
+</html>

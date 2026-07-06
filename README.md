@@ -54,6 +54,19 @@ your way in.
 > built-in SmallWebRTC client at http://localhost:7860 — handy for a quick voice
 > test without the custom page.
 
+## Run with Docker
+
+The stack is two containers — the bot and a tiny nginx that serves the door page
+and proxies `/start` to the bot, so the page and the API share one origin:
+
+```bash
+cp .env.example .env        # fill in the keys
+docker compose up --build
+```
+
+Open **http://localhost:8080**. In production, put this behind a TLS-terminating
+reverse proxy (the browser only grants microphone access over HTTPS).
+
 ### Environment variables
 
 | Var | What | Where |
@@ -86,10 +99,16 @@ a Gemini session is ever opened.
 
 ## Deploy notes
 
-- Transport is **Daily** in production too (no coturn, no NAT tuning). Daily free
-  tier: 10,000 participant-min/month, then $0.004/participant-min.
-- Serve the page over **HTTPS** (Caddy/nginx + Let's Encrypt) — browsers only
+- **Docker**: `Dockerfile` builds the bot; `docker-compose.yml` runs bot + web.
+  Point your edge reverse proxy at the `web` container (or its published `:8080`).
+- Transport is **Daily** in production too (no coturn, no NAT tuning) — WebRTC
+  media flows browser ↔ Daily cloud ↔ bot, so only a short `POST /start` ever
+  hits your origin. That makes it safe to run behind Cloudflare or any CDN. Daily
+  free tier: 10,000 participant-min/month, then $0.004/participant-min.
+- Serve the page over **HTTPS** (nginx/Caddy + Let's Encrypt) — browsers only
   grant microphone access on a secure origin.
+- Put the real per-IP / daily gate in the edge proxy in front of `/start`, before
+  a Gemini session is ever opened (behind Cloudflare, key it on `CF-Connecting-IP`).
 
 ## Tech
 

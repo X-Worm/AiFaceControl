@@ -189,8 +189,11 @@
       import { DailyTransport } from "@pipecat-ai/daily-transport";
 
       // --- Configure ---
-      // Bot runner. Local: http://localhost:7860/start · Prod: https://your-domain/start
-      const BOT_START_URL = "http://localhost:7860/start";
+      // Docker/prod serve the page and the bot on one origin (nginx proxies /start),
+      // so a relative URL just works. The bare `python -m http.server` dev flow serves
+      // the page on :8000 while the bot runs on :7860 — point straight at the bot there.
+      const DEV = location.port === "8000" || location.protocol === "file:";
+      const BOT_START_URL = DEV ? "http://localhost:7860/start" : "/start";
       const GITHUB_URL = "https://github.com/X-Worm/AiFaceControl";
       // -----------------
 

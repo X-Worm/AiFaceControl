@@ -1,0 +1,22 @@
+# Self-contained stack: the Pipecat bot + a tiny nginx that serves the door page
+# and proxies /start to the bot. `docker compose up` then open http://localhost:8080.
+services:
+  bot:
+    build: .
+    container_name: aifacecontrol-bot
+    env_file: .env
+    expose:
+      - "7860"
+    restart: unless-stopped
+
+  web:
+    image: nginx:alpine
+    container_name: aifacecontrol-web
+    depends_on:
+      - bot
+    volumes:
+      - ./client:/usr/share/nginx/html:ro
+      - ./deploy/app.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8080:80"
+    restart: unless-stopped
